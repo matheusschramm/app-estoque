@@ -1,5 +1,18 @@
 # Fase 7 — Busca sem acento no Histórico
 
+> **Estado:** aplicada no banco de **testes** e em **produção** (07/10/2026).
+>
+> **Pendência: o teste de RLS da seção 2.3.** Como a migração já está no ar, isto
+> deixou de ser "testar antes de aplicar" e passou a ser **verificar o que está
+> rodando** — nos dois bancos.
+>
+> A 2.3 não é formalidade. Esta migração usa `create or replace view`, e a view só
+> respeita o RLS das tabelas-base com `security_invoker = on`. Sem o flag,
+> `vw_auditoria_movimentacoes` roda com a permissão da dona e devolve o histórico de
+> **todos** os locais para qualquer usuário autenticado, furando a restrição por local
+> inteira. O script repete o `alter view` justamente por isso, mas é o que precisa ser
+> conferido.
+
 **Onde rodar:** SQL Editor do Supabase (banco de **TESTES**).
 **Pré-requisito:** nenhum além do schema atual.
 **Impacto no app:** nenhum até a tela nova entrar. A view ganha uma coluna a mais, e
