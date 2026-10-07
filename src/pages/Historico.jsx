@@ -8,6 +8,10 @@ import { useToast } from '../lib/toast';
 
 const PAGE_SIZE = 20;
 
+/* Valor sentinela do <select> de motivo. Não pode ser '' porque isso já
+   significa "todos", nem um código real, porque o alvo é motivo nulo. */
+const SEM_MOTIVO = '__sem_motivo__';
+
 function TipoBadge({ tipo }) {
   if (tipo === 'entrada') {
     return (
@@ -58,8 +62,23 @@ export default function Historico() {
   /* filtros */
   const [busca, setBusca]       = useState('');
   const [filtroTipo, setFiltroTipo] = useState('');
+  const [filtroMotivo, setFiltroMotivo] = useState('');
   const [filtroInicio, setFiltroInicio] = useState('');
   const [filtroFim, setFiltroFim]       = useState('');
+
+  /* Opções do filtro de motivo. Vêm da tabela, e não de um allowlist como na
+     tela de Movimentações: aqui o objetivo é achar o que já foi gravado, o que
+     inclui os motivos que o sistema gera sozinho (ajuste, saldo_inicial) e que
+     o usuário nunca escolhe à mão. */
+  const [motivos, setMotivos] = useState([]);
+
+  useEffect(() => {
+    supabase
+      .from('motivos_movimentacao')
+      .select('codigo, descricao')
+      .order('descricao')
+      .then(({ data }) => { if (data) setMotivos(data); });
+  }, []);
 
   const fetchHistorico = useCallback(async () => {
     if (loadingLocal) return;
@@ -79,6 +98,10 @@ export default function Historico() {
       .range(pagina * PAGE_SIZE, pagina * PAGE_SIZE + PAGE_SIZE - 1);
 
     if (filtroTipo)   query = query.eq('tipo', filtroTipo);
+    /* motivo_id é anulável, e a tabela mostra "—" nesses casos. Sem a opção
+       SEM_MOTIVO não haveria como isolar justamente essas linhas. */
+    if (filtroMotivo === SEM_MOTIVO) query = query.is('motivo', null);
+    else if (filtroMotivo)           query = query.eq('motivo', filtroMotivo);
     if (filtroInicio) query = query.gte('data', new Date(filtroInicio).toISOString());
     if (filtroFim)    query = query.lte('data', new Date(filtroFim + 'T23:59:59').toISOString());
     if (busca.trim()) {
@@ -97,12 +120,12 @@ export default function Historico() {
       setTotal(count ?? 0);
     }
     setLoading(false);
-  }, [pagina, filtroTipo, filtroInicio, filtroFim, busca, localAtual, loadingLocal]);
+  }, [pagina, filtroTipo, filtroMotivo, filtroInicio, filtroFim, busca, localAtual, loadingLocal]);
 
   useEffect(() => { fetchHistorico(); }, [fetchHistorico]);
 
   /* resetar página ao mudar filtros ou local */
-  useEffect(() => { setPagina(0); }, [filtroTipo, filtroInicio, filtroFim, busca, localAtual]);
+  useEffect(() => { setPagina(0); }, [filtroTipo, filtroMotivo, filtroInicio, filtroFim, busca, localAtual]);
 
   /* A exclusão apaga a linha do histórico; o saldo é devolvido pelo trigger
      tg_reverte_estoque, não por uma segunda chamada daqui — se fosse em duas
@@ -190,6 +213,22 @@ export default function Historico() {
           </select>
         </div>
 
+        {/* Motivo */}
+        <div className="flex flex-col gap-1">
+          <label className="text-[10px] font-bold text-app-text-label uppercase tracking-widest">Motivo</label>
+          <select
+            value={filtroMotivo}
+            onChange={e => setFiltroMotivo(e.target.value)}
+            className="input-base py-2 text-[12px]"
+          >
+            <option value="">Todos</option>
+            {motivos.map(m => (
+              <option key={m.codigo} value={m.codigo}>{m.descricao}</option>
+            ))}
+            <option value={SEM_MOTIVO}>Sem motivo</option>
+          </select>
+        </div>
+
         {/* Data início */}
         <div className="flex flex-col gap-1">
           <label className="text-[10px] font-bold text-app-text-label uppercase tracking-widest">De</label>
@@ -213,10 +252,13 @@ export default function Historico() {
         </div>
 
         {/* Limpar filtros */}
-        {(busca || filtroTipo || filtroInicio || filtroFim) && (
+        {(busca || filtroTipo || filtroMotivo || filtroInicio || filtroFim) && (
           <button
             className="btn btn-secondary text-[12px] py-2 self-end"
-            onClick={() => { setBusca(''); setFiltroTipo(''); setFiltroInicio(''); setFiltroFim(''); }}
+            onClick={() => {
+              setBusca(''); setFiltroTipo(''); setFiltroMotivo('');
+              setFiltroInicio(''); setFiltroFim('');
+            }}
           >
             Limpar
           </button>
