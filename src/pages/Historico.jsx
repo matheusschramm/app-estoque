@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { Search, ArrowDownCircle, ArrowUpCircle, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
 import { ConfirmDialog, traduzErro } from '../components/TabelaCrud';
 import { useToast } from '../lib/toast';
+import { normalizar } from '../lib/texto';
 
 const PAGE_SIZE = 20;
 
@@ -90,9 +91,14 @@ export default function Historico() {
     }
     setLoading(true);
 
+    /* Colunas explícitas em vez de '*': a view tem a coluna "busca", que só
+       serve para o filtro abaixo e não precisa vir para o navegador. */
     let query = supabase
       .from('vw_auditoria_movimentacoes')
-      .select('*', { count: 'exact' })
+      .select(
+        'id, data, tipo, quantidade, unidade, motivo_descricao, produto, apresentacao, local, usuario',
+        { count: 'exact' }
+      )
       .eq('local_id', localAtual.id)
       .order('data', { ascending: false })
       .range(pagina * PAGE_SIZE, pagina * PAGE_SIZE + PAGE_SIZE - 1);
@@ -104,15 +110,16 @@ export default function Historico() {
     else if (filtroMotivo)           query = query.eq('motivo', filtroMotivo);
     if (filtroInicio) query = query.gte('data', new Date(filtroInicio).toISOString());
     if (filtroFim)    query = query.lte('data', new Date(filtroFim + 'T23:59:59').toISOString());
-    if (busca.trim()) {
-      // vírgulas/parênteses quebram a sintaxe do .or() do PostgREST
-      const termo = busca.replace(/[,()]/g, ' ').trim();
-      if (termo) {
-        query = query.or(
-          `produto.ilike.%${termo}%,usuario.ilike.%${termo}%`
-        );
-      }
-    }
+    /* O filtro bate na coluna "busca" da view, que já vem sem acento e em
+       maiúsculas (produto + apresentação + usuário). Por isso o termo também
+       é normalizado antes de sair daqui: as duas pontas têm que combinar.
+
+       Era um .or() com dois ilike, e vírgula ou parêntese no texto quebravam
+       a sintaxe do .or() do PostgREST — a busca falhava calada. Havia um
+       replace arrancando esses caracteres do que o usuário digitava. Com uma
+       coluna só não há .or() para quebrar, e nada precisa ser arrancado. */
+    const termo = normalizar(busca).trim();
+    if (termo) query = query.ilike('busca', `%${termo}%`);
 
     const { data, count, error } = await query;
     if (!error) {
@@ -193,7 +200,7 @@ export default function Historico() {
               type="text"
               value={busca}
               onChange={e => setBusca(e.target.value)}
-              placeholder="Produto ou usuário..."
+              placeholder="Produto, apresentação ou usuário..."
               className="input-base w-full pl-8 py-2 text-[12px]"
             />
           </div>

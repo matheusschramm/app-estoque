@@ -482,6 +482,10 @@ comment on view vw_sugestao_compra is
 -- -------------------------------------------------------------
 -- 14. VIEW — auditoria de movimentações com nome do usuário
 -- -------------------------------------------------------------
+-- unaccent é usado na coluna "busca" abaixo. Fica no schema extensions,
+-- onde a Supabase mantém as demais (pgcrypto, usado na seção 20).
+create extension if not exists unaccent with schema extensions;
+
 create or replace view vw_auditoria_movimentacoes as
 select
   m.id,
@@ -498,7 +502,20 @@ select
   l.nome                                   as local,
   pf.nome                                  as usuario,
   pa.nome                                  as cargo_usuario,
-  pf.is_admin                              as usuario_admin
+  pf.is_admin                              as usuario_admin,
+  -- Coluna de busca da tela de Histórico: os campos que ela pesquisa,
+  -- concatenados, sem acento e em maiúsculas. Existe porque o ilike do
+  -- Postgres não ignora acento ('acucar' ilike '%AÇÚCAR%' é falso) e a tela
+  -- filtra no servidor, já que pagina de 20 em 20. O unaccent daqui e o
+  -- normalizar() do JavaScript chegam ao mesmo resultado para as letras do
+  -- português, que é o que mantém as duas pontas da busca de acordo.
+  -- Sem índice de propósito: unaccent é STABLE, não IMMUTABLE, então indexar
+  -- exigiria um wrapper imutável — não paga para o volume desta base.
+  upper(extensions.unaccent(
+    coalesce(p.nome, '') || ' ' ||
+    coalesce(a.descricao, '') || ' ' ||
+    coalesce(pf.nome, '')
+  ))                                       as busca
 from movimentacoes            m
 join estoques                 e  on e.id  = m.estoque_id
 join apresentacoes            a  on a.id  = e.apresentacao_id
@@ -515,7 +532,7 @@ order by m.data desc;
 alter view vw_auditoria_movimentacoes set (security_invoker = on);
 
 comment on view vw_auditoria_movimentacoes is
-  'Histórico completo de movimentações com produto, local e usuário responsável.';
+  'Histórico completo de movimentações com produto, local e usuário responsável. A coluna busca concatena produto, apresentação e usuário sem acento, para o filtro de texto da tela.';
 
 -- -------------------------------------------------------------
 -- 15. ÍNDICES — performance em consultas comuns

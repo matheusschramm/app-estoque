@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Search, Plus, Filter, Package } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import { useNavigate } from 'react-router-dom';
 import { useLocal } from '../contexts/LocalContext';
+import { normalizar, algumContem } from '../lib/texto';
 
 function Catalog() {
   const navigate = useNavigate();
@@ -82,16 +83,15 @@ function Catalog() {
     fetchData();
   }, [localAtual, loadingLocal]);
 
-  const dadosFiltrados = data.filter(item => {
-    if (!busca) return true;
-    const termo = busca.toLowerCase();
-    return (
-      item.produto.toLowerCase().includes(termo) ||
-      item.categoria.toLowerCase().includes(termo) ||
-      item.apresentacao.toLowerCase().includes(termo) ||
-      item.local.toLowerCase().includes(termo)
-    );
-  });
+  /* Normaliza o termo uma vez, não a cada linha da tabela. */
+  const termo = useMemo(() => normalizar(busca).trim(), [busca]);
+
+  const dadosFiltrados = useMemo(
+    () => data.filter(item =>
+      !termo || algumContem(termo, item.produto, item.categoria, item.apresentacao, item.local)
+    ),
+    [data, termo]
+  );
 
   const getStatusBadge = (status) => {
     switch (status) {

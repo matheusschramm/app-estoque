@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { useLocal } from '../contexts/LocalContext';
 import { Search, Download, Printer, Package } from 'lucide-react';
+import { normalizar, algumContem } from '../lib/texto';
 
 function formatarDataHora(d) {
   return d.toLocaleString('pt-BR', {
@@ -57,14 +58,13 @@ export default function RelatorioEstoque() {
     fetchData();
   }, [localAtual, loadingLocal]);
 
-  const filtrados = rows.filter(r => {
-    if (!busca.trim()) return true;
-    const t = busca.toLowerCase();
-    return (
-      r.produto.toLowerCase().includes(t) ||
-      r.apresentacao.toLowerCase().includes(t)
-    );
-  });
+  /* Normaliza o termo uma vez, não a cada linha da tabela. */
+  const termo = useMemo(() => normalizar(busca).trim(), [busca]);
+
+  const filtrados = useMemo(
+    () => rows.filter(r => !termo || algumContem(termo, r.produto, r.apresentacao)),
+    [rows, termo]
+  );
 
   const exportarCSV = () => {
     const cabecalho = ['Produto', 'Apresentação', 'Estoque atual', 'Unidade'];

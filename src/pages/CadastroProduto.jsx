@@ -9,13 +9,10 @@ import { useLocal } from '../contexts/LocalContext';
 import { traduzErro } from '../components/TabelaCrud';
 import Kbd from '../components/Kbd';
 import { useToast } from '../lib/toast';
+import { normalizar } from '../lib/texto';
 
-/* Comparação de nomes ignorando acento e caixa: "ACUCAR" acha "AÇÚCAR".
-   Roda no cliente porque o catálogo inteiro cabe em poucos KB — busca
-   instantânea, sem debounce nem ida ao servidor a cada tecla. */
-const normalizar = (s) =>
-  (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
-
+/* A comparação roda no cliente porque o catálogo inteiro cabe em poucos KB:
+   busca instantânea, sem debounce nem ida ao servidor a cada tecla. */
 const MAX_SUGESTOES = 8;
 
 /* ─────────────────────────────────────────────

@@ -31,10 +31,10 @@ Onde aparece:
 
 | Arquivo | Linhas |
 |---|---|
-| `src/pages/Movimentacoes.jsx` | 285, 304, 325, 345 |
+| `src/pages/Movimentacoes.jsx` | 283, 302, 323, 343 |
 | `src/pages/Configuracoes.jsx` | 500, 741 |
-| `src/pages/Historico.jsx` | 125, 128 |
-| `src/pages/CadastroProduto.jsx` | 171 |
+| `src/pages/Historico.jsx` | 132, 135 |
+| `src/pages/CadastroProduto.jsx` | 168 |
 | `src/pages/Compras.jsx` | 25 |
 | `src/pages/ProdutoDetalhe.jsx` | 68 |
 | `src/components/TabelaCrud.jsx` | 66 |
@@ -75,7 +75,7 @@ Correção de uma linha.
 
 ## 4. `react-hooks/exhaustive-deps` — 1 aviso — **NÃO CORRIGIR**
 
-`src/pages/Movimentacoes.jsx:347`
+`src/pages/Movimentacoes.jsx:345`
 
 ```jsx
 useEffect(() => {

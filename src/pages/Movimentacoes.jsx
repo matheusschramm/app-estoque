@@ -10,6 +10,7 @@ import {
 import { traduzErro } from '../components/TabelaCrud';
 import Kbd from '../components/Kbd';
 import { useToast } from '../lib/toast';
+import { normalizar } from '../lib/texto';
 
 /* ─── helpers ─── */
 function Label({ children, required }) {
@@ -50,9 +51,6 @@ function Spinner() {
    O catálogo vem de uma consulta só, no lugar de um ilike por tecla: com
    ida ao servidor a cada letra a navegação por teclado fica intragável, e
    o ilike ainda ignora acento ("acucar" não achava "AÇÚCAR"). */
-const normalizar = (s) =>
-  (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
-
 const MAX_RESULTADOS = 10;
 
 function ProdutoBusca({ valor, onValorChange, onSelect, erro, inputRef }) {
