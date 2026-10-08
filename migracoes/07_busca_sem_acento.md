@@ -118,30 +118,65 @@ select produto, apresentacao, usuario, busca
 
 ### 2.2 O acento deixou de importar
 
-Pegue um produto que tenha acento no nome:
+São três passos, do que não depende de dado nenhum para o que depende.
+
+> **Antes de interpretar um zero aqui:** a `vw_auditoria_movimentacoes` parte de
+> `movimentacoes`, então produto **sem lançamento não aparece nela**. Num banco novo a
+> view está vazia e qualquer contagem dá zero — sem que isso diga nada sobre a
+> migração. O passo 1 existe justamente para separar os dois casos.
+
+#### 1. O mecanismo — vale até em banco vazio
 
 ```sql
-select nome from produtos where nome <> upper(extensions.unaccent(nome)) limit 5;
+select upper(extensions.unaccent('Açúcar Cristal')) as normalizado;
 ```
 
-Se voltar algo — digamos `AÇÚCAR` — confirme que a busca sem acento acha:
+Esperado: `ACUCAR CRISTAL`. É isto que prova a migração: a extensão existe e produz
+exatamente o mesmo que o `normalizar()` do JavaScript. Se der erro de função
+inexistente, o `create extension` do bloco 1 não pegou.
+
+#### 2. A coluna da view está normalizada
 
 ```sql
-select count(*) as achou_sem_acento
-  from vw_auditoria_movimentacoes
- where busca ilike '%ACUCAR%';
-
-select count(*) as achou_com_acento
-  from vw_auditoria_movimentacoes
- where busca ilike '%AÇÚCAR%';
+select
+  (select count(*) from vw_auditoria_movimentacoes)            as linhas_na_view,
+  (select count(*) from vw_auditoria_movimentacoes
+    where busca <> upper(extensions.unaccent(busca)))          as busca_mal_normalizada;
 ```
 
-Esperado: `achou_sem_acento` maior que zero, e `achou_com_acento` **igual a zero** — a
-coluna guarda a versão sem acento, então é com ela que a tela compara. É por isso que o
-frontend normaliza o termo antes de enviar.
+`busca_mal_normalizada` tem que ser **0**: se a coluna já está sem acento e em
+maiúsculas, normalizá-la de novo não muda nada.
 
-> Se o passo anterior não devolveu nenhum produto acentuado, este teste não prova nada
-> nesta base. Cadastre um produto com acento no app e repita, ou pule para o 2.3.
+`linhas_na_view` em **0** significa que o banco ainda não tem movimentação. Não é
+falha — é só que não há o que medir aqui. Pule para a 2.3.
+
+#### 3. Ponta a ponta, com o termo tirado dos próprios dados
+
+O termo de busca sai da base, em vez de ser chumbado no script — assim o teste não
+depende de existir um produto com um nome específico.
+
+```sql
+with amostra as (
+  select produto
+    from vw_auditoria_movimentacoes
+   where produto <> upper(extensions.unaccent(produto))
+   limit 1
+)
+select a.produto                             as produto_com_acento,
+       upper(extensions.unaccent(a.produto)) as termo_sem_acento,
+       (select count(*)
+          from vw_auditoria_movimentacoes v
+         where v.busca ilike '%' || upper(extensions.unaccent(a.produto)) || '%')
+                                             as achou_buscando_sem_acento
+  from amostra a;
+```
+
+Com uma linha de resultado, `achou_buscando_sem_acento` tem que ser **maior que zero**
+— é a prova de que digitar sem acento encontra o produto acentuado.
+
+**Zero linhas de resultado não é falha:** significa que nenhum produto com movimentação
+tem acento no nome. Nesse caso o passo 1 já garantiu o mecanismo, e a prova de verdade
+é na tela — busque "acucar" no Histórico e veja se acha "AÇÚCAR".
 
 ### 2.3 O RLS continua valendo
 
