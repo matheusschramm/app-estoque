@@ -158,22 +158,74 @@ where n.nspname = 'public'
   and c.relname = 'vw_auditoria_movimentacoes';
 ```
 
-Tem que vir `on` ou `true`. Para provar na prática, com um não-admin:
+Tem que vir `on` ou `true`. Essa consulta é a checagem principal — se vier `off`,
+corrija com `alter view vw_auditoria_movimentacoes set (security_invoker = on);` e
+rode de novo.
+
+#### Prova prática
+
+Pegue o UUID de um **não-admin**. Tem que ser não-admin: `fn_is_admin()` concede tudo,
+então um admin enxergaria o histórico inteiro mesmo com o RLS perfeito.
 
 ```sql
 select id, nome from perfis where is_admin = false order by nome;
 ```
 
+O bloco abaixo devolve **uma linha com o veredito**. Ele tira um acesso do usuário
+antes de medir, porque alguém que já enxerga todos os locais não provaria nada — e o
+`rollback` no fim devolve o acesso, nada fica gravado.
+
 ```sql
 begin;
+  -- Remove um dos acessos do usuário (desfeito no rollback).
+  delete from usuarios_locais
+   where usuario_id = 'COLE-O-UUID-DO-NAO-ADMIN'
+     and local_id = (select min(local_id) from usuarios_locais
+                      where usuario_id = 'COLE-O-UUID-DO-NAO-ADMIN');
+
   set local role authenticated;
   set local request.jwt.claims to '{"sub":"COLE-O-UUID-DO-NAO-ADMIN"}';
-  select count(*) as auditoria_visivel from vw_auditoria_movimentacoes;
+
+  select
+    (select is_admin from perfis where id = auth.uid())                as eh_admin,
+
+    (select coalesce(string_agg(l.nome, ', ' order by l.nome), '(nenhum)')
+       from usuarios_locais ul
+       join locais l on l.id = ul.local_id
+      where ul.usuario_id = auth.uid())                                as locais_concedidos,
+
+    (select coalesce(string_agg(x.nome_local, ', ' order by x.nome_local), '(nenhum)')
+       from (select distinct local as nome_local
+               from vw_auditoria_movimentacoes) x)                     as locais_no_historico,
+
+    (select count(*) from vw_auditoria_movimentacoes)                  as linhas_visiveis,
+
+    (select not exists (
+       select 1 from vw_auditoria_movimentacoes v
+        where not exists (
+          select 1 from usuarios_locais ul
+           where ul.usuario_id = auth.uid()
+             and ul.local_id   = v.local_id)))                         as rls_ok;
 rollback;
 ```
 
-O número tem que ser menor que o total, a não ser que esse usuário tenha acesso a
-todos os locais.
+Como ler o resultado:
+
+| Coluna | O que esperar |
+|---|---|
+| `eh_admin` | **false**. Se vier `true`, o UUID está errado e o teste não vale |
+| `locais_concedidos` | os locais que sobraram para ele, um a menos que o normal |
+| `locais_no_historico` | tem que ser **igual ou subconjunto** de `locais_concedidos` |
+| `linhas_visiveis` | movimentações que ele enxerga — informativo, não é veredito |
+| `rls_ok` | **true**. É esta a resposta |
+
+`rls_ok` é `true` quando toda linha visível pertence a um local concedido. Se vier
+`false`, ou aparecer em `locais_no_historico` um local que não está em
+`locais_concedidos`, a view está furando o RLS.
+
+> `linhas_visiveis` conta **movimentações**, não locais — não compare esse número com a
+> quantidade de locais cadastrados. Dez movimentações em um único local é um resultado
+> perfeitamente normal.
 
 ---
 
