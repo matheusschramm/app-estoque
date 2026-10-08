@@ -3,7 +3,7 @@
 Registro do que o `npx eslint src` acusa hoje, para limpar de uma vez depois que
 a refatoração de acesso por local terminar.
 
-**Estado em 07/10/2026:** 17 erros e 1 aviso, em 10 arquivos.
+**Estado em 08/10/2026:** 17 erros e 1 aviso, em 10 arquivos.
 Nenhum quebra o build — `npx vite build` passa limpo.
 
 ```
@@ -35,7 +35,7 @@ Onde aparece:
 | `src/pages/Configuracoes.jsx` | 500, 741 |
 | `src/pages/Historico.jsx` | 132, 135 |
 | `src/pages/CadastroProduto.jsx` | 168 |
-| `src/pages/Compras.jsx` | 25 |
+| `src/pages/Compras.jsx` | 26 |
 | `src/pages/ProdutoDetalhe.jsx` | 68 |
 | `src/components/TabelaCrud.jsx` | 66 |
 | `src/contexts/LocalContext.jsx` | 57 |

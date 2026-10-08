@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { useLocal } from '../contexts/LocalContext';
 import { ShoppingCart, TrendingUp, Package, AlertCircle } from 'lucide-react';
+import { normalizar, algumContem } from '../lib/texto';
 
 function StatCard({ label, value, sub, color = 'text-app-text' }) {
   return (
@@ -38,14 +39,13 @@ export default function Compras() {
       });
   }, [localAtual, loadingLocal]);
 
-  const filtrados = rows.filter(r => {
-    if (!busca.trim()) return true;
-    const t = busca.toLowerCase();
-    return (
-      r.produto?.toLowerCase().includes(t) ||
-      r.categoria?.toLowerCase().includes(t)
-    );
-  });
+  /* Normaliza o termo uma vez, não a cada linha da tabela. */
+  const termo = useMemo(() => normalizar(busca).trim(), [busca]);
+
+  const filtrados = useMemo(
+    () => rows.filter(r => !termo || algumContem(termo, r.produto, r.categoria)),
+    [rows, termo]
+  );
 
   const totalItensComprar = rows.filter(r => Number(r.quantidade_sugerida_compra) > 0).length;
   const totalSemEstoque   = rows.filter(r => Number(r.estoque_atual) <= 0).length;
